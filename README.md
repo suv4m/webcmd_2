@@ -1,6 +1,6 @@
 # ResearchScout
 
-ResearchScout is a hackathon MVP for a **self-learning research-paper browser**. Enter a research idea and it discovers matching OpenAlex papers, showing their publication year, venue, authors, citation count, abstract, and source link.
+ResearchScout is a hackathon MVP for a **self-learning research-paper browser**. Enter a research idea and it discovers matching OpenAlex papers, showing their publication year, venue, authors, citation count, abstract, and source link and many more thing.
 
 It is now a React + Vite frontend with an Express backend. The backend calls OpenAlex's public API, stores feedback in `server/data/feedback.json`, and applies that feedback when ranking later searches.
 
