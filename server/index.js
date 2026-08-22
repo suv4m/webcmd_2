@@ -16,7 +16,17 @@ app.use(cors()); app.use(express.json({ limit: '100kb' }));
 async function profile() { if (!existsSync(feedbackFile)) return { positive: {}, negative: {} }; try { return JSON.parse(await readFile(feedbackFile, 'utf8')); } catch { return { positive: {}, negative: {} }; } }
 async function saveProfile(data) { await mkdir(feedbackDir, { recursive: true }); const temp = `${feedbackFile}.tmp`; await writeFile(temp, JSON.stringify(data, null, 2)); await rename(temp, feedbackFile); }
 function abstractFromIndex(index) { if (!index || typeof index !== 'object') return ''; const words = []; for (const [word, positions] of Object.entries(index)) if (Array.isArray(positions)) for (const position of positions) words[position] = word; return words.join(' '); }
-function normalize(work) { return { id: work.id, title: work.title || 'Untitled paper', year: work.publication_year || 'Unknown', authors: (work.authorships || []).map(item => item.author?.display_name).filter(Boolean).join(', '), venue: work.primary_location?.source?.display_name || work.locations?.[0]?.source?.display_name || '', url: work.primary_location?.landing_page_url || work.doi || work.id, abstract: abstractFromIndex(work.abstract_inverted_index), citations: Number(work.cited_by_count || 0), source: 'OpenAlex' }; }
+function indiaContext(work, abstract) {
+  const institutions = (work.authorships || []).flatMap(item => item.institutions || []);
+  const indianAffiliations = institutions.filter(institution => institution.country_code === 'IN' || /\b(india|indian)\b/i.test(institution.display_name || '')).length;
+  const mentionsIndia = /\b(india|indian)\b/i.test(`${work.title || ''} ${abstract}`);
+  const score = indianAffiliations * 3 + (mentionsIndia ? 1 : 0);
+  return { score, label: indianAffiliations ? 'Indian affiliation' : mentionsIndia ? 'India mentioned' : '' };
+}
+function normalize(work) {
+  const abstract = abstractFromIndex(work.abstract_inverted_index);
+  return { id: work.id, title: work.title || 'Untitled paper', year: work.publication_year || 'Unknown', authors: (work.authorships || []).map(item => item.author?.display_name).filter(Boolean).join(', '), venue: work.primary_location?.source?.display_name || work.locations?.[0]?.source?.display_name || '', url: work.primary_location?.landing_page_url || work.doi || work.id, abstract, citations: Number(work.cited_by_count || 0), indiaContext: indiaContext(work, abstract), source: 'OpenAlex' };
+}
 function relevance(paper, idea, data) { const paperTokens = new Set(tokens(`${paper.title} ${paper.abstract}`)); const overlap = tokens(idea).filter(term => paperTokens.has(term)).length * 20; const learned = [...paperTokens].reduce((total, term) => total + (data.positive[term] || 0) * 2 - (data.negative[term] || 0) * 3, 0); return Math.max(0, Math.round(overlap + Math.min(Math.log10(paper.citations + 1) * 6, 25) + Math.max(0, Number(paper.year) - 2018) + learned)); }
 function validYear(value, name) { if (!value) return null; const year = Number(value); if (!Number.isInteger(year) || year < 1900 || year > 2100) throw new Error(`${name} must be a valid year.`); return year; }
 
